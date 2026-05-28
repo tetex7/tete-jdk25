@@ -36,6 +36,7 @@ import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.MemberReferenceTree.ReferenceMode;
 import com.sun.source.tree.ModuleTree.ModuleKind;
 
+import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.code.Source.Feature;
 import com.sun.tools.javac.file.PathFileObject;
@@ -226,7 +227,7 @@ public class JavacParser implements Parser {
         this.allowYieldStatement = Feature.SWITCH_EXPRESSION.allowedInSource(source);
         this.allowRecords = Feature.RECORDS.allowedInSource(source);
         this.allowSealedTypes = Feature.SEALED_CLASSES.allowedInSource(source);
-        updateUnexpectedTopLevelDefinitionStartError(false);
+        updateUnexpectedTopLevelDefinitionStartError(true);
     }
 
     protected AbstractEndPosTable newEndPosTable(boolean keepEndPositions) {
@@ -4153,10 +4154,22 @@ public class JavacParser implements Parser {
 
         for (JCTree def : origDefs) {
             if (def.hasTag(Tag.PACKAGEDEF)) {
-                log.error(def.pos(), Errors.ImplicitClassShouldNotHavePackageDeclaration);
+                //log.error(def.pos(), Errors.ImplicitClassShouldNotHavePackageDeclaration);
+                topDefs.append(def);
             } else if (def.hasTag(Tag.IMPORT) || def.hasTag(Tag.MODULEIMPORT)) {
                 topDefs.append(def);
             } else if (!def.hasTag(Tag.SKIP)) {
+                if (def.getKind() == Tree.Kind.CLASS)
+                {
+                    if (def instanceof JCClassDecl kclass)
+                    {
+                        kclass.mods.flags = kclass.mods.flags | Flags.STATIC;
+                    }
+                    else
+                    {
+                        throw new RuntimeException("Class but not");
+                    }
+                }
                 defs.append(def);
             }
         }
@@ -4173,7 +4186,7 @@ public class JavacParser implements Parser {
 
         Name name = names.fromString(simplename);
         JCModifiers implicitMods = F.at(Position.NOPOS)
-                .Modifiers(Flags.FINAL|Flags.IMPLICIT_CLASS, List.nil());
+                .Modifiers(Flags.PUBLIC|Flags.FINAL|Flags.IMPLICIT_CLASS, List.nil());
         JCClassDecl implicit = F.at(primaryPos).ClassDef(
                 implicitMods, name, List.nil(), null, List.nil(), List.nil(),
                 defs.toList());
